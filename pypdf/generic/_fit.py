@@ -160,9 +160,11 @@ class Fit:
         return Fit(fit_type="/FitBV", fit_args=(left,))
 
     def __str__(self) -> str:
-        if not self.fit_args:
-            return f"Fit({self.fit_type})"
-        return f"Fit({self.fit_type}, {self.fit_args})"
+        return (
+            f"Fit({self.fit_type}, {self.fit_args})"
+            if self.fit_args
+            else f"Fit({self.fit_type})"
+        )
 
 
 DEFAULT_FIT = Fit.fit()

@@ -243,12 +243,7 @@ def prepare_cm(ft: DictionaryObject) -> bytes:
     for i in range(len(ll)):
         j = ll[i].find(b">")
         if j >= 0:
-            if j == 0:
-                # string is empty: stash a placeholder here (see below)
-                # see https://github.com/py-pdf/pypdf/issues/1111
-                content = b"."
-            else:
-                content = ll[i][:j].replace(b" ", b"")
+            content = b"." if j == 0 else ll[i][:j].replace(b" ", b"")
             ll[i] = content + b" " + ll[i][j + 1 :]
     cm = (
         (b" ".join(ll))
@@ -267,7 +262,7 @@ def process_cm_line(
     map_dict: Dict[Any, Any],
     int_entry: List[int],
 ) -> Tuple[bool, bool, Union[None, Tuple[int, int]]]:
-    if line in (b"", b" ") or line[0] == 37:  # 37 = %
+    if line in {b"", b" "} or line[0] == 37:  # 37 = %
         return process_rg, process_char, multiline_rg
     if b"beginbfrange" in line:
         process_rg = True
@@ -296,7 +291,7 @@ def parse_bfrange(
         fmt = b"%%0%dX" % (map_dict[-1] * 2)
         a = multiline_rg[0]  # a, b not in the current line
         b = multiline_rg[1]
-        for sq in lst[0:]:
+        for sq in lst[:]:
             if sq == b"]":
                 closure_found = True
                 break
@@ -376,11 +371,8 @@ def compute_space_width(
             w1[-1] = cast(float, ft1["/DW"])
         except Exception:
             w1[-1] = 1000.0
-        if "/W" in ft1:
-            w = list(ft1["/W"])
-        else:
-            w = []
-        while len(w) > 0:
+        w = list(ft1["/W"]) if "/W" in ft1 else []
+        while w:
             st = w[0]
             second = w[1]
             if isinstance(second, int):

@@ -110,7 +110,7 @@ def test_addition_gap(a: PageRange, b: PageRange):
 
 def test_addition_non_page_range():
     with pytest.raises(TypeError) as exc:
-        PageRange(slice(0, 5)) + "2:7"
+        f"{PageRange(slice(0, 5))}2:7"
     assert exc.value.args[0] == "Can't add PageRange and <class 'str'>"
 
 

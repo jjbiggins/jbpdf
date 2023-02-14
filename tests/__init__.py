@@ -66,8 +66,7 @@ def _strip_position(line: str) -> str:
         A line with stripped position
     """
     line = ".py".join(line.split(".py:")[1:])
-    line = " ".join(line.split(" ")[1:])
-    return line
+    return " ".join(line.split(" ")[1:])
 
 
 def normalize_warnings(caplog_text: str) -> List[str]:

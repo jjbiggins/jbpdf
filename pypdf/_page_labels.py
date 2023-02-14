@@ -89,7 +89,7 @@ def number2uppercase_roman_numeral(num: int) -> str:
             if num <= 0:
                 break
 
-    return "".join([a for a in roman_num(num)])
+    return "".join(list(roman_num(num)))
 
 
 def number2lowercase_roman_numeral(number: int) -> str:
@@ -199,7 +199,7 @@ def nums_insert(
 
     i = len(nums)
     while i != 0 and key <= nums[i - 2]:
-        i = i - 2
+        i -= 2
 
     if i < len(nums) and key == nums[i]:
         nums[i + 1] = value
@@ -251,7 +251,4 @@ def nums_next(
         raise ValueError("a nums like array must have an even number of elements")
 
     i = nums.index(key) + 2
-    if i < len(nums):
-        return (nums[i], nums[i + 1])
-    else:
-        return (None, None)
+    return (nums[i], nums[i + 1]) if i < len(nums) else (None, None)

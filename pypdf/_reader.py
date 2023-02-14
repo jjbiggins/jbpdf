@@ -135,9 +135,7 @@ class DocumentInformation(DictionaryObject):
 
     def _get_text(self, key: str) -> Optional[str]:
         retval = self.get(key, None)
-        if isinstance(retval, TextStringObject):
-            return retval
-        return None
+        return retval if isinstance(retval, TextStringObject) else None
 
     def getText(self, key: str) -> Optional[str]:  # deprecated
         """
@@ -339,10 +337,10 @@ class PdfReader:
             ):
                 # raise if password provided
                 raise WrongPasswordError("Wrong password")
-            self._override_encryption = False
-        else:
-            if password is not None:
-                raise PdfReadError("Not encrypted file")
+            else:
+                self._override_encryption = False
+        elif password is not None:
+            raise PdfReadError("Not encrypted file")
 
     @property
     def pdf_header(self) -> str:
@@ -440,15 +438,11 @@ class PdfReader:
             PdfReadError: if file is encrypted and restrictions prevent
                 this action.
         """
-        # Flattened pages will not work on an Encrypted PDF;
-        # the PDF file's page count is used in this case. Otherwise,
-        # the original method (flattened page count) is used.
         if self.is_encrypted:
             return self.trailer[TK.ROOT]["/Pages"]["/Count"]  # type: ignore
-        else:
-            if self.flattened_pages is None:
-                self._flatten()
-            return len(self.flattened_pages)  # type: ignore
+        if self.flattened_pages is None:
+            self._flatten()
+        return len(self.flattened_pages)  # type: ignore
 
     def getNumPages(self) -> int:  # deprecated
         """
@@ -686,14 +680,11 @@ class PdfReader:
         """
 
         def indexed_key(k: str, fields: dict) -> str:
-            if k not in fields:
-                return k
-            else:
-                return (
-                    k
-                    + "."
-                    + str(sum([1 for kk in fields if kk.startswith(k + ".")]) + 2)
-                )
+            return (
+                k
+                if k not in fields
+                else f'{k}.{str(sum(bool(kk.startswith(f"{k}.")) for kk in fields) + 2)}'
+            )
 
         # Retrieve document form fields
         formfields = self.get_fields()
@@ -832,8 +823,7 @@ class PdfReader:
 
         # see if there are any more outline items
         while True:
-            outline_obj = self._build_outline_item(node)
-            if outline_obj:
+            if outline_obj := self._build_outline_item(node):
                 outline.append(outline_obj)
 
             # check for sub-outline
@@ -900,8 +890,7 @@ class PdfReader:
         else:
             idnum = indirect_reference.idnum
         assert self._page_id2num is not None, "hint for mypy"
-        ret = self._page_id2num.get(idnum, -1)
-        return ret
+        return self._page_id2num.get(idnum, -1)
 
     def get_page_number(self, page: PageObject) -> int:
         """
@@ -968,7 +957,7 @@ class PdfReader:
             page = NullObject()
             return Destination(title, page, Fit.fit())
         else:
-            page, typ = array[0:2]  # type: ignore
+            page, typ = array[:2]
             array = array[2:]
             try:
                 return Destination(title, page, Fit(fit_type=typ, fit_args=array))  # type: ignore
@@ -1006,7 +995,11 @@ class PdfReader:
             if isinstance(dest, DictionaryObject) and "/D" in dest:
                 dest = dest["/D"]
 
-        if isinstance(dest, ArrayObject):
+        if (
+            isinstance(dest, ArrayObject)
+            or not isinstance(dest, str)
+            and dest is None
+        ):
             outline_item = self._build_destination(title, dest)
         elif isinstance(dest, str):
             # named destination, addresses NameObject Issue #193
@@ -1018,10 +1011,6 @@ class PdfReader:
             except KeyError:
                 # named destination not found in Name Dict
                 outline_item = self._build_destination(title, None)
-        elif dest is None:
-            # outline item not required to have destination or action
-            # PDFv1.7 Table 153
-            outline_item = self._build_destination(title, dest)
         else:
             if self.strict:
                 raise PdfReadError(f"Unexpected destination {dest!r}")
@@ -1176,20 +1165,8 @@ class PdfReader:
             pages = catalog["/Pages"].get_object()  # type: ignore
             self.flattened_pages = []
 
-        t = "/Pages"
-        if PA.TYPE in pages:
-            t = pages[PA.TYPE]  # type: ignore
-
-        if t == "/Pages":
-            for attr in inheritable_page_attributes:
-                if attr in pages:
-                    inherit[attr] = pages[attr]
-            for page in pages[PA.KIDS]:  # type: ignore
-                addt = {}
-                if isinstance(page, IndirectObject):
-                    addt["indirect_reference"] = page
-                self._flatten(page.get_object(), inherit, **addt)
-        elif t == "/Page":
+        t = pages[PA.TYPE] if PA.TYPE in pages else "/Pages"
+        if t == "/Page":
             for attr_in, value in list(inherit.items()):
                 # if the page has it's own value, it does not inherit the
                 # parent's value:
@@ -1200,6 +1177,15 @@ class PdfReader:
 
             # TODO: Could flattened_pages be None at this point?
             self.flattened_pages.append(page_obj)  # type: ignore
+        elif t == "/Pages":
+            for attr in inheritable_page_attributes:
+                if attr in pages:
+                    inherit[attr] = pages[attr]
+            for page in pages[PA.KIDS]:  # type: ignore
+                addt = {}
+                if isinstance(page, IndirectObject):
+                    addt["indirect_reference"] = page
+                self._flatten(page.get_object(), inherit, **addt)
 
     def _get_object_from_stream(
         self, indirect_reference: IndirectObject
@@ -1652,19 +1638,13 @@ class PdfReader:
                             f"entry {num} in Xref table invalid but object found",
                             __name__,
                         )
-                        generation = int(f.group(1))
+                        generation = int(f[1])
                         offset = f.start()
 
                 if generation not in self.xref:
                     self.xref[generation] = {}
                     self.xref_free_entry[generation] = {}
-                if num in self.xref[generation]:
-                    # It really seems like we should allow the last
-                    # xref table in the file to override previous
-                    # ones. Since we read the file backwards, assume
-                    # any existing key is already set correctly.
-                    pass
-                else:
+                if num not in self.xref[generation]:
                     self.xref[generation][num] = offset
                     try:
                         self.xref_free_entry[generation][num] = entry_type_b == b"f"
@@ -1710,14 +1690,13 @@ class PdfReader:
                 try:
                     xrefstream = self._read_pdf15_xref_stream(stream)
                 except Exception as e:
-                    if TK.ROOT in self.trailer:
-                        logger_warning(
-                            f"Previous trailer can not be read {e.args}",
-                            __name__,
-                        )
-                        break
-                    else:
+                    if TK.ROOT not in self.trailer:
                         raise PdfReadError(f"trailer can not be read {e.args}")
+                    logger_warning(
+                        f"Previous trailer can not be read {e.args}",
+                        __name__,
+                    )
+                    break
                 trailer_keys = TK.ROOT, TK.ENCRYPT, TK.INFO, TK.ID
                 for key in trailer_keys:
                     if key in xrefstream and key not in self.trailer:
@@ -1753,11 +1732,7 @@ class PdfReader:
                     __name__,
                 )
             stream.seek(p, 0)
-        if "/Prev" in new_trailer:
-            startxref = new_trailer["/Prev"]
-            return startxref
-        else:
-            return None
+        return new_trailer["/Prev"] if "/Prev" in new_trailer else None
 
     def _read_xref_other_error(
         self, stream: StreamType, startxref: int
@@ -1827,10 +1802,7 @@ class PdfReader:
 
             # PDF Spec Table 17: A value of zero for an element in the
             # W array indicates...the default value shall be used
-            if i == 0:
-                return 1  # First value defaults to 1
-            else:
-                return 0
+            return 1 if i == 0 else 0
 
         def used_before(num: int, generation: Union[int, Tuple[int, ...]]) -> bool:
             # We move backwards through the xrefs, don't replace any.
@@ -1932,13 +1904,13 @@ class PdfReader:
 
     def read_next_end_line(
         self, stream: StreamType, limit_offset: int = 0
-    ) -> bytes:  # deprecated
+    ) -> bytes:    # deprecated
         """.. deprecated:: 2.1.0"""
         deprecate_no_replacement("read_next_end_line", removed_in="4.0.0")
         line_parts = []
         while True:
             # Prevent infinite loops in malformed PDFs
-            if stream.tell() == 0 or stream.tell() == limit_offset:
+            if stream.tell() in [0, limit_offset]:
                 raise PdfReadError("Could not read malformed PDF file")
             x = stream.read(1)
             if stream.tell() < 2:
@@ -1994,19 +1966,16 @@ class PdfReader:
         return self._encryption.verify(password)
 
     def decode_permissions(self, permissions_code: int) -> Dict[str, bool]:
-        # Takes the permissions as an integer, returns the allowed access
-        permissions = {}
-        permissions["print"] = permissions_code & (1 << 3 - 1) != 0  # bit 3
-        permissions["modify"] = permissions_code & (1 << 4 - 1) != 0  # bit 4
-        permissions["copy"] = permissions_code & (1 << 5 - 1) != 0  # bit 5
-        permissions["annotations"] = permissions_code & (1 << 6 - 1) != 0  # bit 6
-        permissions["forms"] = permissions_code & (1 << 9 - 1) != 0  # bit 9
-        permissions["accessability"] = permissions_code & (1 << 10 - 1) != 0  # bit 10
-        permissions["assemble"] = permissions_code & (1 << 11 - 1) != 0  # bit 11
-        permissions["print_high_quality"] = (
-            permissions_code & (1 << 12 - 1) != 0
-        )  # bit 12
-        return permissions
+        return {
+            "print": permissions_code & (1 << 3 - 1) != 0,
+            "modify": permissions_code & (1 << 4 - 1) != 0,
+            "copy": permissions_code & (1 << 5 - 1) != 0,
+            "annotations": permissions_code & (1 << 6 - 1) != 0,
+            "forms": permissions_code & (1 << 9 - 1) != 0,
+            "accessability": permissions_code & (1 << 10 - 1) != 0,
+            "assemble": permissions_code & (1 << 11 - 1) != 0,
+            "print_high_quality": permissions_code & (1 << 12 - 1) != 0,
+        }
 
     @property
     def is_encrypted(self) -> bool:
@@ -2055,8 +2024,9 @@ class PdfReader:
                 tag = f
                 f = next(i)
                 if isinstance(f, IndirectObject):
-                    field = cast(Optional[EncodedStreamObject], f.get_object())
-                    if field:
+                    if field := cast(
+                        Optional[EncodedStreamObject], f.get_object()
+                    ):
                         es = zlib.decompress(field._data)
                         retval[tag] = es
         return retval
@@ -2087,7 +2057,7 @@ class PdfReader:
         interim[NameObject("/Kids")] = acroform[NameObject("/Fields")]
         self.cache_indirect_object(
             0,
-            max([i for (g, i) in self.resolved_objects.keys() if g == 0]) + 1,
+            max(i for (g, i) in self.resolved_objects.keys() if g == 0) + 1,
             interim,
         )
         arr = ArrayObject()

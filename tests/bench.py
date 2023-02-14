@@ -117,10 +117,7 @@ def test_merge(benchmark):
 
 def text_extraction(pdf_path):
     reader = PdfReader(pdf_path)
-    text = ""
-    for page in reader.pages:
-        text += page.extract_text()
-    return text
+    return "".join(page.extract_text() for page in reader.pages)
 
 
 def test_text_extraction(benchmark):

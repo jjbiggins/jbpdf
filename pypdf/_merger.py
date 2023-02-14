@@ -165,23 +165,22 @@ class PdfMerger:
                 'bookmarks') from being imported by specifying this as ``False``.
         """
         if position is not None:  # deprecated
-            if page_number is None:
-                page_number = position
-                old_term = "position"
-                new_term = "page_number"
-                warnings.warn(
-                    (
-                        f"{old_term} is deprecated as an argument and will be "
-                        f"removed in pypdf=4.0.0. Use {new_term} instead"
-                    ),
-                    DeprecationWarning,
-                )
-            else:
+            if page_number is not None:
                 raise ValueError(
                     "The argument position of merge is deprecated. "
                     "Use page_number only."
                 )
 
+            page_number = position
+            old_term = "position"
+            new_term = "page_number"
+            warnings.warn(
+                (
+                    f"{old_term} is deprecated as an argument and will be "
+                    f"removed in pypdf=4.0.0. Use {new_term} instead"
+                ),
+                DeprecationWarning,
+            )
         if page_number is None:  # deprecated
             # The paremter is only marked as Optional as long as
             # position is not fully deprecated
@@ -499,8 +498,7 @@ class PdfMerger:
         lst = pages if isinstance(pages, list) else list(range(*pages))
         for i, outline_item in enumerate(outline):
             if isinstance(outline_item, list):
-                sub = self._trim_outline(pdf, outline_item, lst)  # type: ignore
-                if sub:
+                if sub := self._trim_outline(pdf, outline_item, lst):
                     if not prev_header_added:
                         new_outline.append(outline[i - 1])
                     new_outline.append(sub)  # type: ignore
@@ -649,10 +647,7 @@ class PdfMerger:
 
         for i, oi_enum in enumerate(root):
             if isinstance(oi_enum, list):
-                # oi_enum is still an inner node
-                # (OutlineType, if recursive types were supported by mypy)
-                res = self.find_outline_item(outline_item, oi_enum)  # type: ignore
-                if res:
+                if res := self.find_outline_item(outline_item, oi_enum):
                     return [i] + res
             elif (
                 oi_enum == outline_item
@@ -837,6 +832,6 @@ class PdfFileMerger(PdfMerger):  # deprecated
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         deprecation_with_replacement("PdfFileMerger", "PdfMerger", "3.0.0")
 
-        if "strict" not in kwargs and len(args) < 1:
+        if "strict" not in kwargs and not args:
             kwargs["strict"] = True  # maintain the default
         super().__init__(*args, **kwargs)

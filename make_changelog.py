@@ -146,12 +146,11 @@ def get_most_recent_git_tag() -> str:
     Returns:
         Most recently created git tag.
     """
-    git_tag = str(
+    return str(
         subprocess.check_output(
             ["git", "describe", "--abbrev=0"], stderr=subprocess.STDOUT
         )
     ).strip("'b\\n")
-    return git_tag
 
 
 def get_git_commits_since_tag(git_tag: str) -> List[Change]:

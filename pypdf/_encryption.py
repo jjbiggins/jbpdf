@@ -88,10 +88,7 @@ try:
             if len(data) % 16:
                 data = pad(data, 16)
             d = aes.decrypt(data)
-            if len(d) == 0:
-                return d
-            else:
-                return d[: -d[-1]]
+            return d if len(d) == 0 else d[: -d[-1]]
 
     def RC4_encrypt(key: bytes, data: bytes) -> bytes:
         return ARC4.ARC4Cipher(key).encrypt(data)
@@ -123,7 +120,7 @@ except ImportError:
 
         def encrypt(self, data: bytes) -> bytes:
             S = list(self.S)
-            out = list(0 for _ in range(len(data)))
+            out = [0 for _ in range(len(data))]
             i, j = 0, 0
             for k in range(len(data)):
                 i = (i + 1) % 256
@@ -310,7 +307,7 @@ class AlgV4:
         u_hash.update(o_entry)
         u_hash.update(struct.pack("<I", P))
         u_hash.update(id1_entry)
-        if rev >= 4 and metadata_encrypted is False:
+        if rev >= 4 and not metadata_encrypted:
             u_hash.update(b"\xff\xff\xff\xff")
         u_hash_digest = u_hash.digest()
         length = key_size // 8
@@ -367,8 +364,7 @@ class AlgV4:
             for _ in range(50):
                 o_hash_digest = hashlib.md5(o_hash_digest).digest()
 
-        rc4_key = o_hash_digest[: key_size // 8]
-        return rc4_key
+        return o_hash_digest[: key_size // 8]
 
     @staticmethod
     def compute_O_value(rc4_key: bytes, user_password: bytes, rev: int) -> bytes:
@@ -415,9 +411,7 @@ class AlgV4:
             The value
         """
         if rev <= 2:
-            value = RC4_encrypt(key, _PADDING)
-            return value
-
+            return RC4_encrypt(key, _PADDING)
         """
         Algorithm 5: Computing the encryption dictionary’s U (user password) value.
 
@@ -651,8 +645,7 @@ class AlgV5:
             return b""
         iv = bytes(0 for _ in range(16))
         tmp_key = AlgV5.calculate_hash(R, password, o_value[40:48], u_value[:48])
-        key = AES_CBC_decrypt(tmp_key, iv, oe_value)
-        return key
+        return AES_CBC_decrypt(tmp_key, iv, oe_value)
 
     @staticmethod
     def verify_user_password(
@@ -861,8 +854,7 @@ class AlgV5:
         b8 = b"T" if metadata_encrypted else b"F"
         rr = bytes(random.randrange(0, 256) for _ in range(4))
         data = struct.pack("<I", p) + b"\xff\xff\xff\xff" + b8 + b"adb" + rr
-        perms = AES_ECB_encrypt(key, data)
-        return perms
+        return AES_ECB_encrypt(key, data)
 
 
 class PasswordType(IntEnum):
@@ -1009,8 +1001,7 @@ class Encryption:
         o_entry = cast(ByteStringObject, self.entry["/O"].get_object()).original_bytes
         u_entry = cast(ByteStringObject, self.entry["/U"].get_object()).original_bytes
 
-        # verify owner password first
-        key = AlgV4.verify_owner_password(
+        if key := AlgV4.verify_owner_password(
             password,
             R,
             self.key_size,
@@ -1019,10 +1010,9 @@ class Encryption:
             P,
             self.id1_entry,
             metadata_encrypted,
-        )
-        if key:
+        ):
             return key, PasswordType.OWNER_PASSWORD
-        key = AlgV4.verify_user_password(
+        if key := AlgV4.verify_user_password(
             password,
             R,
             self.key_size,
@@ -1031,8 +1021,7 @@ class Encryption:
             P,
             self.id1_entry,
             metadata_encrypted,
-        )
-        if key:
+        ):
             return key, PasswordType.USER_PASSWORD
         return b"", PasswordType.NOT_DECRYPTED
 
