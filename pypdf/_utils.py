@@ -90,7 +90,7 @@ def _get_max_pdf_version_header(header1: bytes, header2: bytes) -> bytes:
         pdf_header_indices.append(versions.index(header1))
     if header2 in versions:
         pdf_header_indices.append(versions.index(header2))
-    if len(pdf_header_indices) == 0:
+    if not pdf_header_indices:
         raise ValueError(f"neither {header1!r} nor {header2!r} are proper headers")
     return versions[max(pdf_header_indices)]
 
@@ -321,10 +321,7 @@ def str_(b: bytes) -> str:
 
 
 def str_(b: Union[str, bytes]) -> str:
-    if isinstance(b, bytes):
-        return b.decode("latin-1")
-    else:
-        return b
+    return b.decode("latin-1") if isinstance(b, bytes) else b
 
 
 @overload
@@ -343,9 +340,7 @@ def ord_(b: int) -> int:
 
 
 def ord_(b: Union[int, str, bytes]) -> Union[int, bytes]:
-    if isinstance(b, str):
-        return ord(b)
-    return b
+    return ord(b) if isinstance(b, str) else b
 
 
 def hexencode(b: bytes) -> bytes:

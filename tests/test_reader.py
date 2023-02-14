@@ -304,7 +304,7 @@ def test_get_images_raw(
         b"startxref %d\n"
         b"%%%%EOF"
     )
-    pdf_data = pdf_data % (
+    pdf_data %= (
         pdf_data.find(b"1 0 obj"),
         pdf_data.find(b"2 0 obj"),
         pdf_data.find(b"3 0 obj"),
@@ -499,7 +499,7 @@ def test_read_prev_0_trailer():
         b"%%%%EOF"
     )
     with_prev_0 = True
-    pdf_data = pdf_data % (
+    pdf_data %= (
         pdf_data.find(b"1 0 obj"),
         pdf_data.find(b"2 0 obj"),
         pdf_data.find(b"3 0 obj"),
@@ -535,7 +535,7 @@ def test_read_missing_startxref():
         # Removed for this test: b"startxref %d\n"
         b"%%%%EOF"
     )
-    pdf_data = pdf_data % (
+    pdf_data %= (
         pdf_data.find(b"1 0 obj"),
         pdf_data.find(b"2 0 obj"),
         pdf_data.find(b"3 0 obj"),
@@ -571,7 +571,7 @@ def test_read_unknown_zero_pages(caplog):
         b"startxref %d\n"
         b"%%%%EOF"
     )
-    pdf_data = pdf_data % (
+    pdf_data %= (
         pdf_data.find(b"1 0 obj"),
         pdf_data.find(b"2 0 obj"),
         pdf_data.find(b"3 0 obj"),
@@ -1025,14 +1025,13 @@ def test_outline_font_format():
 
 def get_outline_property(outline, attribute_name: str):
     results = []
-    if isinstance(outline, list):
-        for outline_item in outline:
-            if isinstance(outline_item, Destination):
-                results.append(getattr(outline_item, attribute_name))
-            else:
-                results.append(get_outline_property(outline_item, attribute_name))
-    else:
+    if not isinstance(outline, list):
         raise ValueError(f"got {type(outline)}")
+    for outline_item in outline:
+        if isinstance(outline_item, Destination):
+            results.append(getattr(outline_item, attribute_name))
+        else:
+            results.append(get_outline_property(outline_item, attribute_name))
     return results
 
 

@@ -57,16 +57,10 @@ class PdfObject(PdfObjectProtocol):
     indirect_reference: Optional["IndirectObject"]
 
     def hash_value_data(self) -> bytes:
-        return ("%s" % self).encode()
+        return f"{self}".encode()
 
     def hash_value(self) -> bytes:
-        return (
-            "%s:%s"
-            % (
-                self.__class__.__name__,
-                self.hash_func(self.hash_value_data()).hexdigest(),
-            )
-        ).encode()
+        return f"{self.__class__.__name__}:{self.hash_func(self.hash_value_data()).hexdigest()}".encode()
 
     def clone(
         self,
@@ -274,9 +268,7 @@ class IndirectObject(PdfObject):
 
     def get_object(self) -> Optional["PdfObject"]:
         obj = self.pdf.get_object(self)
-        if obj is None:
-            return None
-        return obj.get_object()
+        return None if obj is None else obj.get_object()
 
     def __repr__(self) -> str:
         return f"IndirectObject({self.idnum!r}, {self.generation!r}, {id(self.pdf)})"
@@ -367,8 +359,7 @@ class FloatObject(float, PdfObject):
         if self == 0:
             return "0.0"
         nb = int(log10(abs(self)))
-        s = f"{self:.{max(1,16-nb)}f}".rstrip("0").rstrip(".")
-        return s
+        return f"{self:.{max(1,16-nb)}f}".rstrip("0").rstrip(".")
 
     def __repr__(self) -> str:
         return self.myrepr()  # repr(float(self))
@@ -424,9 +415,7 @@ class NumberObject(int, PdfObject):
     @staticmethod
     def read_from_stream(stream: StreamType) -> Union["NumberObject", "FloatObject"]:
         num = read_until_regex(stream, NumberObject.NumberPattern)
-        if num.find(b".") != -1:
-            return FloatObject(num)
-        return NumberObject(num)
+        return FloatObject(num) if num.find(b".") != -1 else NumberObject(num)
 
     @staticmethod
     def readFromStream(
@@ -639,15 +628,14 @@ class NameObject(str, PdfObject):
                     pass
             raise UnicodeDecodeError("", name, 0, 0, "Code Not Found")
         except (UnicodeEncodeError, UnicodeDecodeError) as e:
-            if not pdf.strict:
-                logger_warning(
-                    f"Illegal character in Name Object ({repr(name)})", __name__
-                )
-                return NameObject(name.decode("charmap"))
-            else:
+            if pdf.strict:
                 raise PdfReadError(
                     f"Illegal character in Name Object ({repr(name)})"
                 ) from e
+            logger_warning(
+                f"Illegal character in Name Object ({repr(name)})", __name__
+            )
+            return NameObject(name.decode("charmap"))
 
     @staticmethod
     def readFromStream(

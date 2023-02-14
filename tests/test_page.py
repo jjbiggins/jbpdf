@@ -35,10 +35,8 @@ def get_all_sample_files():
     meta_file = SAMPLE_ROOT / "files.json"
     if not os.path.isfile(meta_file):
         return {"data": []}
-    with open(meta_file) as fp:
-        data = fp.read()
-    meta = json.loads(data)
-    return meta
+    data = Path(meta_file).read_text()
+    return json.loads(data)
 
 
 all_files_meta = get_all_sample_files()
@@ -523,8 +521,8 @@ def test_extract_text_visitor_callbacks():
         return (texts, rectangles)
 
     def extract_table(
-        texts: List[PositionedText], rectangles: List[Rectangle]
-    ) -> List[List[List[PositionedText]]]:
+            texts: List[PositionedText], rectangles: List[Rectangle]
+        ) -> List[List[List[PositionedText]]]:
         """
         Extracts a table containing text.
 
@@ -598,7 +596,7 @@ def test_extract_text_visitor_callbacks():
             if r not in rectangle2texts:
                 curr_row.append("")
                 continue
-            cell_texts = [t for t in rectangle2texts[r]]
+            cell_texts = list(rectangle2texts[r])
             curr_row.append(cell_texts)
 
         return rows

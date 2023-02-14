@@ -441,12 +441,11 @@ class PageObject(DictionaryObject):
         page.__setitem__(NameObject(PG.PARENT), NullObject())
         page.__setitem__(NameObject(PG.RESOURCES), DictionaryObject())
         if width is None or height is None:
-            if pdf is not None and len(pdf.pages) > 0:
-                lastpage = pdf.pages[len(pdf.pages) - 1]
-                width = lastpage.mediabox.width
-                height = lastpage.mediabox.height
-            else:
+            if pdf is None or len(pdf.pages) <= 0:
                 raise PageSizeNotDefinedError
+            lastpage = pdf.pages[len(pdf.pages) - 1]
+            width = lastpage.mediabox.width
+            height = lastpage.mediabox.height
         page.__setitem__(
             NameObject(PG.MEDIABOX), RectangleObject((0, 0, width, height))  # type: ignore
         )
@@ -725,10 +724,7 @@ class PageObject(DictionaryObject):
             The ``/Contents`` object, or ``None`` if it doesn't exist.
             ``/Contents`` is optional, as described in PDF Reference  7.7.3.3
         """
-        if PG.CONTENTS in self:
-            return self[PG.CONTENTS].get_object()  # type: ignore
-        else:
-            return None
+        return self[PG.CONTENTS].get_object() if PG.CONTENTS in self else None
 
     def getContents(self) -> Optional[ContentStream]:  # deprecated
         """
@@ -821,7 +817,7 @@ class PageObject(DictionaryObject):
             )
             if new:
                 new_resources[NameObject(res)] = new
-                rename.update(newrename)
+                rename |= newrename
 
         # Combine /ProcSet sets, making sure there's a consistent order
         new_resources[NameObject(RES.PROC_SET)] = ArrayObject(
@@ -915,7 +911,7 @@ class PageObject(DictionaryObject):
                 _, newrename = self._merge_resources(
                     original_resources, page2resources, res, False
                 )
-                rename.update(newrename)
+                rename |= newrename
         # Combine /ProcSet sets.
         if RES.PROC_SET in page2resources:
             if RES.PROC_SET not in original_resources:
@@ -930,10 +926,7 @@ class PageObject(DictionaryObject):
             if PG.ANNOTS not in self:
                 self[NameObject(PG.ANNOTS)] = ArrayObject()
             annots = cast(ArrayObject, self[PG.ANNOTS].get_object())
-            if ctm is None:
-                trsf = Transformation()
-            else:
-                trsf = Transformation(ctm)
+            trsf = Transformation() if ctm is None else Transformation(ctm)
             for a in cast(ArrayObject, page2[PG.ANNOTS]):
                 a = a.get_object()
                 aa = a.clone(pdf, ignore_fields=("/P", "/StructParent"))
@@ -1052,7 +1045,7 @@ class PageObject(DictionaryObject):
                 for i in range(0, 8, 2)
             )
         else:
-            new_x = corners2[0:8:2]
+            new_x = corners2[:8:2]
             new_y = corners2[1:8:2]
         lowerleft = (min(new_x), min(new_y))
         upperright = (max(new_x), max(new_y))
@@ -1530,10 +1523,7 @@ class PageObject(DictionaryObject):
         for ope, op in ContentStream(
             self["/Contents"].get_object(), self.pdf, "bytes"
         ).operations:
-            if op == b"TJ":
-                s = [x for x in ope[0] if isinstance(x, str)]
-            else:
-                s = []
+            s = [x for x in ope[0] if isinstance(x, str)] if op == b"TJ" else []
             out += op.decode("utf-8") + " " + "".join(s) + ope.__repr__() + "\n"
         out += "\n=============================\n"
         try:
@@ -1686,8 +1676,6 @@ class PageObject(DictionaryObject):
                 if visitor_text is not None:
                     visitor_text(text, cm_matrix, tm_matrix, cmap[3], font_size)
                 text = ""
-            # table 4.7 "Graphics state operators", page 219
-            # cm_matrix calculation is a reserved for the moment
             elif operator == b"q":
                 cm_stack.append(
                     (
@@ -1729,7 +1717,6 @@ class PageObject(DictionaryObject):
                     ],
                     cm_matrix,
                 )
-            # Table 5.2 page 398
             elif operator == b"Tz":
                 char_scale = float(operands[0]) / 100.0
             elif operator == b"Tw":
@@ -1758,17 +1745,11 @@ class PageObject(DictionaryObject):
                     )
                 except KeyError:  # font not found
                     _space_width = unknown_char_map[1]
-                    cmap = (
-                        unknown_char_map[2],
-                        unknown_char_map[3],
-                        "???" + operands[0],
-                        None,
-                    )
+                    cmap = unknown_char_map[2], unknown_char_map[3], f"???{operands[0]}", None
                 try:
                     font_size = float(operands[1])
                 except Exception:
                     pass  # keep previous size
-            # Table 5.5 page 406
             elif operator == b"Td":
                 check_crlf_space = True
                 # A special case is a translating only tm:
@@ -1829,10 +1810,7 @@ class PageObject(DictionaryObject):
                         # "\u0590 - \u08FF \uFB50 - \uFDFF"
                         for x in [cmap[1][x] if x in cmap[1] else x for x in t]:
                             # x can be a sequence of bytes ; ex: habibi.pdf
-                            if len(x) == 1:
-                                xx = ord(x)
-                            else:
-                                xx = 1
+                            xx = ord(x) if len(x) == 1 else 1
                             # fmt: off
                             if (
                                 # cases where the current inserting order is kept
@@ -1865,7 +1843,7 @@ class PageObject(DictionaryObject):
                                         visitor_text(text, cm_matrix, tm_matrix, cmap[3], font_size)
                                     text = ""
                                 text = text + x
-                            # fmt: on
+                                                # fmt: on
             else:
                 return None
             if check_crlf_space:
@@ -1977,13 +1955,14 @@ class PageObject(DictionaryObject):
                 for op in operands[0]:
                     if isinstance(op, (str, bytes)):
                         process_operation(b"Tj", [op])
-                    if isinstance(op, (int, float, NumberObject, FloatObject)):
-                        if (
-                            (abs(float(op)) >= _space_width)
-                            and (len(text) > 0)
-                            and (text[-1] != " ")
-                        ):
-                            process_operation(b"Tj", [" "])
+                    if isinstance(
+                        op, (int, float, NumberObject, FloatObject)
+                    ) and (
+                        (abs(float(op)) >= _space_width)
+                        and (len(text) > 0)
+                        and (text[-1] != " ")
+                    ):
+                        process_operation(b"Tj", [" "])
             elif operator == b"Do":
                 output += text
                 if visitor_text is not None:
@@ -2078,7 +2057,7 @@ class PageObject(DictionaryObject):
         Returns:
             The extracted text
         """
-        if len(args) >= 1:
+        if args:
             if isinstance(args[0], str):
                 Tj_sep = args[0]
                 if len(args) >= 2:
@@ -2295,10 +2274,7 @@ class PageObject(DictionaryObject):
 
     @property
     def annotations(self) -> Optional[ArrayObject]:
-        if "/Annots" not in self:
-            return None
-        else:
-            return cast(ArrayObject, self["/Annots"])
+        return None if "/Annots" not in self else cast(ArrayObject, self["/Annots"])
 
     @annotations.setter
     def annotations(self, value: Optional[ArrayObject]) -> None:
@@ -2380,9 +2356,8 @@ def _get_fonts_walk(
     fontkeys = ("/FontFile", "/FontFile2", "/FontFile3")
     if "/BaseFont" in obj:
         fnt.add(cast(str, obj["/BaseFont"]))
-    if "/FontName" in obj:
-        if [x for x in fontkeys if x in obj]:  # test to see if there is FontFile
-            emb.add(cast(str, obj["/FontName"]))
+    if "/FontName" in obj and [x for x in fontkeys if x in obj]:
+        emb.add(cast(str, obj["/FontName"]))
 
     for key in obj.keys():
         _get_fonts_walk(cast(DictionaryObject, obj[key]), fnt, emb)

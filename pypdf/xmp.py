@@ -292,11 +292,11 @@ class XmpInformation(PdfObject):
         return self.get_nodes_in_namespace(aboutUri, namespace)
 
     def _get_text(self, element: XmlElement) -> str:
-        text = ""
-        for child in element.childNodes:
-            if child.nodeType == child.TEXT_NODE:
-                text += child.data
-        return text
+        return "".join(
+            child.data
+            for child in element.childNodes
+            if child.nodeType == child.TEXT_NODE
+        )
 
     dc_contributor = property(_getter_bag(DC_NAMESPACE, "contributor"))
     """

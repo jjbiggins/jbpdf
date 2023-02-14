@@ -185,12 +185,7 @@ def _alg33_1(password: str, rev: Literal[2, 3, 4], keylen: int) -> bytes:
     if rev >= 3:
         for _ in range(50):
             md5_hash = md5(md5_hash).digest()
-    # 4. Create an RC4 encryption key using the first n bytes of the output
-    # from the final MD5 hash, where n is always 5 for revision 2 but, for
-    # revision 3 or greater, depends on the value of the encryption
-    # dictionary's /Length entry.
-    key = md5_hash[:keylen]
-    return key
+    return md5_hash[:keylen]
 
 
 def _alg34(

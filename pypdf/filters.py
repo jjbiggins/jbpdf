@@ -316,13 +316,11 @@ class LZWDecode:
                     if cW < self.dictlen:
                         baos += self.dict[cW]
                         p = self.dict[pW] + self.dict[cW][0]
-                        self.dict[self.dictlen] = p
-                        self.dictlen += 1
                     else:
                         p = self.dict[pW] + self.dict[pW][0]
                         baos += p
-                        self.dict[self.dictlen] = p
-                        self.dictlen += 1
+                    self.dict[self.dictlen] = p
+                    self.dictlen += 1
                     if (
                         self.dictlen >= (1 << self.bitspercode) - 1
                         and self.bitspercode < 12
@@ -369,7 +367,7 @@ class ASCII85Decode:
         group_index = b = 0
         out = bytearray()
         for char in data:
-            if ord("!") <= char and char <= ord("u"):
+            if ord("!") <= char <= ord("u"):
                 group_index += 1
                 b = b * 85 + (char - 33)
                 if group_index == 5:
@@ -427,13 +425,7 @@ class CCITParameters:
 
     @property
     def group(self) -> int:
-        if self.K < 0:
-            CCITTgroup = 4
-        else:
-            # k == 0: Pure one-dimensional encoding (Group 3, 1-D)
-            # k > 0: Mixed one- and two-dimensional encoding (Group 3, 2-D)
-            CCITTgroup = 3
-        return CCITTgroup
+        return 4 if self.K < 0 else 3
 
 
 class CCITTFaxDecode:
@@ -556,9 +548,7 @@ def decode_stream_data(stream: Any) -> Union[str, bytes]:  # utils.StreamObject
                 data = CCITTFaxDecode.decode(data, stream.get(SA.DECODE_PARMS), height)
             elif filter_type == "/Crypt":
                 decode_parms = stream.get(SA.DECODE_PARMS, {})
-                if "/Name" not in decode_parms and "/Type" not in decode_parms:
-                    pass
-                else:
+                if "/Name" in decode_parms or "/Type" in decode_parms:
                     raise NotImplementedError(
                         "/Crypt filter with /Name or /Type not supported yet"
                     )

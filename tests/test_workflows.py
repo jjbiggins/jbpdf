@@ -118,9 +118,7 @@ def test_PdfReaderJpegImage():
         reader = PdfReader(inputfile)
 
         # Retrieve the text of the image
-        with open(RESOURCE_ROOT / "jpeg.txt") as pdftext_file:
-            imagetext = pdftext_file.read()
-
+        imagetext = Path(RESOURCE_ROOT / "jpeg.txt").read_text()
         page = reader.pages[0]
         x_object = page[PG.RESOURCES]["/XObject"].get_object()
         data = x_object["/Im4"].get_data()
@@ -848,8 +846,7 @@ def test_get_fonts(url, name, strict):
 def test_get_xmp(url, name, strict):
     data = BytesIO(get_pdf_from_url(url, name=name))
     reader = PdfReader(data, strict=strict)
-    xmp_info = reader.xmp_metadata
-    if xmp_info:
+    if xmp_info := reader.xmp_metadata:
         xmp_info.dc_contributor
         xmp_info.dc_coverage
         xmp_info.dc_creator

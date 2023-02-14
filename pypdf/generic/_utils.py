@@ -79,7 +79,7 @@ def read_string_from_stream(
             try:
                 tok = escape_dict[tok]
             except KeyError:
-                if b"0" <= tok and tok <= b"7":
+                if b"0" <= tok <= b"7":
                     # "The number ddd may consist of one, two, or three
                     # octal digits; high-order overflow shall be ignored.
                     # Three octal digits shall be used, with leading zeros
@@ -87,7 +87,7 @@ def read_string_from_stream(
                     # a digit." (PDF reference 7.3.4.2, p 16)
                     for _ in range(2):
                         ntok = stream.read(1)
-                        if b"0" <= ntok and ntok <= b"7":
+                        if b"0" <= ntok <= b"7":
                             tok += ntok
                         else:
                             stream.seek(-1, 1)  # ntok has to be analysed
@@ -147,7 +147,6 @@ def create_string_object(
                 if string.startswith(codecs.BOM_UTF16_BE):
                     retval = TextStringObject(string.decode("utf-16"))
                     retval.autodetect_utf16 = True
-                    return retval
                 else:
                     # This is probably a big performance hit here, but we need
                     # to convert string objects into the text/unicode-aware
@@ -156,7 +155,7 @@ def create_string_object(
                     # Some strings are strings, some are just byte arrays.
                     retval = TextStringObject(decode_pdfdocencoding(string))
                     retval.autodetect_pdfdocencoding = True
-                    return retval
+                return retval
             except UnicodeDecodeError:
                 return ByteStringObject(string)
     else:

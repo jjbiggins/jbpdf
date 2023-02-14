@@ -805,7 +805,7 @@ def test_write_dict_stream_object():
     objects_hash = [o.hash_value() for o in writer._objects]
     for k, v in writer._idnum_hash.items():
         assert v.pdf == writer
-        assert k in objects_hash, "Missing %s" % v
+        assert k in objects_hash, f"Missing {v}"
 
     os.remove("tmp-writer-do-not-commit.pdf")
 
@@ -1010,7 +1010,7 @@ def test_append_multiple():
     writer.append(reader, [0, 0, 0])  # second pack
     pages = writer._root_object["/Pages"]["/Kids"]
     assert pages[0] not in pages[1:]  # page not repeated
-    assert pages[-1] not in pages[0:-1]  # page not repeated
+    assert pages[-1] not in pages[:-1]
 
 
 @pytest.mark.samples

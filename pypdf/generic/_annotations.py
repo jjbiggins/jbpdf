@@ -46,8 +46,7 @@ class AnnotationBuilder:
         Returns:
             A dictionary object representing the annotation.
         """
-        # TABLE 8.23 Additional entries specific to a text annotation
-        text_obj = DictionaryObject(
+        return DictionaryObject(
             {
                 NameObject("/Type"): NameObject("/Annot"),
                 NameObject("/Subtype"): NameObject("/Text"),
@@ -57,7 +56,6 @@ class AnnotationBuilder:
                 NameObject("/Flags"): NumberObject(flags),
             }
         )
-        return text_obj
 
     @staticmethod
     def free_text(
@@ -91,9 +89,9 @@ class AnnotationBuilder:
             A dictionary object representing the annotation.
         """
         font_str = "font: "
-        if bold is True:
+        if bold:
             font_str = f"{font_str}bold "
-        if italic is True:
+        if italic:
             font_str = f"{font_str}italic "
         font_str = f"{font_str}{font} {font_size}"
         font_str = f"{font_str};text-align:left;color:#{font_color}"
@@ -145,7 +143,7 @@ class AnnotationBuilder:
         Returns:
             A dictionary object representing the annotation.
         """
-        line_obj = DictionaryObject(
+        return DictionaryObject(
             {
                 NameObject("/Type"): NameObject("/Annot"),
                 NameObject("/Subtype"): NameObject("/Line"),
@@ -175,7 +173,6 @@ class AnnotationBuilder:
                 NameObject("/Contents"): TextStringObject(text),
             }
         )
-        return line_obj
 
     @staticmethod
     def rectangle(
@@ -247,7 +244,7 @@ class AnnotationBuilder:
 
     @staticmethod
     def polygon(vertices: List[Tuple[float, float]]) -> DictionaryObject:
-        if len(vertices) == 0:
+        if not vertices:
             raise ValueError("A polygon needs at least 1 vertex with two coordinates")
         x_min, y_min = vertices[0][0], vertices[0][1]
         x_max, y_max = vertices[0][0], vertices[0][1]
@@ -259,9 +256,8 @@ class AnnotationBuilder:
         rect = RectangleObject((x_min, y_min, x_max, y_max))
         coord_list = []
         for x, y in vertices:
-            coord_list.append(NumberObject(x))
-            coord_list.append(NumberObject(y))
-        obj = DictionaryObject(
+            coord_list.extend((NumberObject(x), NumberObject(y)))
+        return DictionaryObject(
             {
                 NameObject("/Type"): NameObject("/Annot"),
                 NameObject("/Subtype"): NameObject("/Polygon"),
@@ -270,7 +266,6 @@ class AnnotationBuilder:
                 NameObject("/Rect"): RectangleObject(rect),
             }
         )
-        return obj
 
     @staticmethod
     def link(

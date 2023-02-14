@@ -227,13 +227,12 @@ class PdfWriter:
                     "Please only set 'indirect_reference'. The 'ido' argument "
                     "is deprecated."
                 )
-            else:
-                indirect_reference = ido
-                warnings.warn(
-                    "The parameter 'ido' is depreciated and will be removed in "
-                    "pypdf 4.0.0.",
-                    DeprecationWarning,
-                )
+            indirect_reference = ido
+            warnings.warn(
+                "The parameter 'ido' is depreciated and will be removed in "
+                "pypdf 4.0.0.",
+                DeprecationWarning,
+            )
         assert (
             indirect_reference is not None
         )  # the None value is only there to keep the deprecated name
@@ -262,9 +261,6 @@ class PdfWriter:
             indirect_reference = indirect_reference.idnum
         self._objects[indirect_reference - 1] = obj
         return self._objects[indirect_reference - 1]
-        if indirect_reference.pdf != self:
-            raise ValueError("pdf must be self")
-        return self._objects[indirect_reference.idnum - 1]  # type: ignore
 
     def _add_page(
         self,
@@ -544,7 +540,7 @@ class PdfWriter:
             return create_string_object(str(oa))
         elif isinstance(oa, ArrayObject):
             try:
-                page, typ = oa[0:2]  # type: ignore
+                page, typ = oa[:2]
                 array = oa[2:]
                 fit = Fit(typ, tuple(array))
                 return Destination("OpenAction", page, fit)
@@ -886,10 +882,7 @@ class PdfWriter:
             pages = cast(DictionaryObject, self._root_object["/Pages"])
             self.flattened_pages = ArrayObject()
         assert pages is not None  # hint for mypy
-        t = "/Pages"
-        if PA.TYPE in pages:
-            t = cast(str, pages[PA.TYPE])
-
+        t = cast(str, pages[PA.TYPE]) if PA.TYPE in pages else "/Pages"
         if t == "/Pages":
             for attr in inheritable_page_attributes:
                 if attr in pages:
@@ -991,13 +984,12 @@ class PdfWriter:
                     "Please only set 'user_password'. "
                     "The 'user_pwd' argument is deprecated."
                 )
-            else:
-                warnings.warn(
-                    "Please use 'user_password' instead of 'user_pwd'. "
-                    "The 'user_pwd' argument is deprecated and "
-                    "will be removed in pypdf 4.0.0."
-                )
-                user_password = user_pwd
+            warnings.warn(
+                "Please use 'user_password' instead of 'user_pwd'. "
+                "The 'user_pwd' argument is deprecated and "
+                "will be removed in pypdf 4.0.0."
+            )
+            user_password = user_pwd
         if user_password is None:  # deprecated
             # user_password is only Optional for due to the deprecated user_pwd
             raise ValueError("user_password may not be None")
@@ -1008,28 +1000,27 @@ class PdfWriter:
                     "The argument owner_pwd of encrypt is deprecated. "
                     "Use owner_password only."
                 )
-            else:
-                old_term = "owner_pwd"
-                new_term = "owner_password"
-                warnings.warn(
-                    message=(
-                        f"{old_term} is deprecated as an argument and will be "
-                        f"removed in pypdf 4.0.0. Use {new_term} instead"
-                    ),
-                    category=DeprecationWarning,
-                )
-                owner_password = owner_pwd
+            old_term = "owner_pwd"
+            new_term = "owner_password"
+            warnings.warn(
+                message=(
+                    f"{old_term} is deprecated as an argument and will be "
+                    f"removed in pypdf 4.0.0. Use {new_term} instead"
+                ),
+                category=DeprecationWarning,
+            )
+            owner_password = owner_pwd
 
         if owner_password is None:
             owner_password = user_password
         if use_128bit:
             V = 2
             rev = 3
-            keylen = int(128 / 8)
+            keylen = 128 // 8
         else:
             V = 1
             rev = 2
-            keylen = int(40 / 8)
+            keylen = 40 // 8
         P = permissions_flag
         O = ByteStringObject(_alg33(owner_password, user_password, rev, keylen))  # type: ignore[arg-type]  # noqa
         ID_1 = ByteStringObject(md5((repr(time.time())).encode("utf8")).digest())
@@ -1164,9 +1155,10 @@ class PdfWriter:
             infos: a Python dictionary where each key is a field
                 and each value is your new metadata.
         """
-        args = {}
-        for key, value in list(infos.items()):
-            args[NameObject(key)] = create_string_object(value)
+        args = {
+            NameObject(key): create_string_object(value)
+            for key, value in list(infos.items())
+        }
         self.get_object(self._info).update(args)  # type: ignore
 
     def addMetadata(self, infos: Dict[str, Any]) -> None:  # deprecated
@@ -1592,11 +1584,7 @@ class PdfWriter:
                     __name__,
                 )
                 page_ref = NullObject()
-            dest = Destination(
-                NameObject("/" + title + " outline item"),
-                page_ref,
-                fit,
-            )
+            dest = Destination(NameObject(f"/{title} outline item"), page_ref, fit)
 
             action_ref = self._add_object(
                 DictionaryObject(
@@ -1769,7 +1757,7 @@ class PdfWriter:
         dest_ref = self._add_object(dest)
         nd = self.get_named_dest_root()
         if not isinstance(title, TextStringObject):
-            title = TextStringObject(str(title))
+            title = TextStringObject(title)
         nd.extend([title, dest_ref])
         return dest_ref
 
@@ -1871,10 +1859,10 @@ class PdfWriter:
                         ):
                             operands[0][i] = TextStringObject()
 
-                if operator == b"q":
-                    seq_graphics = True
                 if operator == b"Q":
                     seq_graphics = False
+                elif operator == b"q":
+                    seq_graphics = True
                 if seq_graphics and operator in jump_operators:
                     continue
                 if operator == b"re":
@@ -1910,31 +1898,32 @@ class PdfWriter:
             for operands, operator in content.operations:
                 if operator in [b"Tj", b"'"]:
                     text = operands[0]
-                    if not ignore_byte_string_object:
-                        if isinstance(text, TextStringObject):
-                            operands[0] = TextStringObject()
-                    else:
-                        if isinstance(text, (TextStringObject, ByteStringObject)):
-                            operands[0] = TextStringObject()
+                    if (
+                        not ignore_byte_string_object
+                        and isinstance(text, TextStringObject)
+                        or ignore_byte_string_object
+                        and isinstance(text, (TextStringObject, ByteStringObject))
+                    ):
+                        operands[0] = TextStringObject()
                 elif operator == b'"':
                     text = operands[2]
-                    if not ignore_byte_string_object:
-                        if isinstance(text, TextStringObject):
-                            operands[2] = TextStringObject()
-                    else:
-                        if isinstance(text, (TextStringObject, ByteStringObject)):
-                            operands[2] = TextStringObject()
+                    if (
+                        not ignore_byte_string_object
+                        and isinstance(text, TextStringObject)
+                        or ignore_byte_string_object
+                        and isinstance(text, (TextStringObject, ByteStringObject))
+                    ):
+                        operands[2] = TextStringObject()
                 elif operator == b"TJ":
                     for i in range(len(operands[0])):
-                        if not ignore_byte_string_object:
-                            if isinstance(operands[0][i], TextStringObject):
-                                operands[0][i] = TextStringObject()
-                        else:
+                        if ignore_byte_string_object:
                             if isinstance(
                                 operands[0][i], (TextStringObject, ByteStringObject)
                             ):
                                 operands[0][i] = TextStringObject()
 
+                        elif isinstance(operands[0][i], TextStringObject):
+                            operands[0][i] = TextStringObject()
             page_ref.__setitem__(NameObject("/Contents"), content)
 
     def removeText(self, ignoreByteStringObject: bool = False) -> None:  # deprecated
@@ -1991,9 +1980,7 @@ class PdfWriter:
 
         if isinstance(rect, str):
             rect = NameObject(rect)
-        elif isinstance(rect, RectangleObject):
-            pass
-        else:
+        elif not isinstance(rect, RectangleObject):
             rect = RectangleObject(rect)
 
         lnk2 = DictionaryObject()
@@ -2057,9 +2044,7 @@ class PdfWriter:
             rect = RectangleObject(
                 [float(num) for num in rect.split(" ") if len(num) > 0]
             )
-        elif isinstance(rect, RectangleObject):
-            pass
-        else:
+        elif not isinstance(rect, RectangleObject):
             rect = RectangleObject(rect)
 
         annotation = AnnotationBuilder.link(
@@ -2142,7 +2127,7 @@ class PdfWriter:
         if not isinstance(layout, NameObject):
             if layout not in self._valid_layouts:
                 logger_warning(
-                    f"Layout should be one of: {'', ''.join(self._valid_layouts)}",
+                    f"Layout should be one of: {'<unknown expression ERROR>':'.join(self._valid_layouts<unknown expression .>{self._valid_layouts}}",
                     __name__,
                 )
             layout = NameObject(layout)
@@ -2532,7 +2517,7 @@ class PdfWriter:
             excluded_fields = ()
         # Find the range of pages to merge.
         if pages is None:
-            pages = list(range(0, len(reader.pages)))
+            pages = list(range(len(reader.pages)))
         elif isinstance(pages, PageRange):
             pages = list(range(*pages.indices(len(reader.pages))))
         elif isinstance(pages, list):
@@ -2886,11 +2871,7 @@ class PdfWriter:
         outline_item: Dict[str, Any],
         root: Optional[OutlineType] = None,
     ) -> Optional[List[int]]:
-        if root is None:
-            o = self.get_outline_root()
-        else:
-            o = cast("TreeObject", root)
-
+        o = self.get_outline_root() if root is None else cast("TreeObject", root)
         i = 0
         while o is not None:
             if (
@@ -2898,18 +2879,15 @@ class PdfWriter:
                 or o.get("/Title", None) == outline_item
             ):
                 return [i]
-            else:
-                if "/First" in o:
-                    res = self.find_outline_item(
-                        outline_item, cast(OutlineType, o["/First"])
-                    )
-                    if res:
-                        return ([i] if "/Title" in o else []) + res
-            if "/Next" in o:
-                i += 1
-                o = cast(TreeObject, o["/Next"])
-            else:
+            if "/First" in o:
+                if res := self.find_outline_item(
+                    outline_item, cast(OutlineType, o["/First"])
+                ):
+                    return ([i] if "/Title" in o else []) + res
+            if "/Next" not in o:
                 return None
+            i += 1
+            o = cast(TreeObject, o["/Next"])
 
     @deprecation_bookmark(bookmark="outline_item")
     def find_bookmark(
@@ -3080,10 +3058,7 @@ def _pdf_objectify(obj: Union[Dict[str, Any], str, int, List[Any]]) -> PdfObject
             arr.append(_pdf_objectify(el))
         return arr
     elif isinstance(obj, str):
-        if obj.startswith("/"):
-            return NameObject(obj)
-        else:
-            return TextStringObject(obj)
+        return NameObject(obj) if obj.startswith("/") else TextStringObject(obj)
     elif isinstance(obj, (int, float)):
         return FloatObject(obj)
     else:

@@ -110,7 +110,7 @@ class PageRange:
 
     def __repr__(self) -> str:
         """A string like "PageRange('1:2:3')"."""
-        return "PageRange(" + repr(str(self)) + ")"
+        return f"PageRange({repr(str(self))})"
 
     def indices(self, n: int) -> Tuple[int, int, int]:
         """
@@ -128,9 +128,7 @@ class PageRange:
         return self._slice.indices(n)
 
     def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, PageRange):
-            return False
-        return self._slice == other._slice
+        return self._slice == other._slice if isinstance(other, PageRange) else False
 
     def __add__(self, other: "PageRange") -> "PageRange":
         if not isinstance(other, PageRange):

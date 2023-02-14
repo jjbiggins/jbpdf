@@ -93,14 +93,14 @@ def test_boolean_object_write():
 
 def test_boolean_eq():
     boolobj = BooleanObject(True)
-    assert (boolobj == True) is True  # noqa: E712
-    assert (boolobj == False) is False  # noqa: E712
-    assert (boolobj == "True") is False
+    assert boolobj == True
+    assert boolobj != False
+    assert boolobj != "True"
 
     boolobj = BooleanObject(False)
-    assert (boolobj == True) is False  # noqa: E712
-    assert (boolobj == False) is True  # noqa: E712
-    assert (boolobj == "True") is False
+    assert boolobj != True
+    assert boolobj == False
+    assert boolobj != "True"
 
 
 def test_boolean_object_exception():
@@ -245,7 +245,7 @@ def test_destination_fit_r():
     assert d.right == FloatObject(0)
     assert d.top == FloatObject(0)
     assert d.bottom == FloatObject(0)
-    assert list(d) == []
+    assert not list(d)
     d.empty_tree()
 
 
@@ -516,7 +516,7 @@ def test_remove_child_found_in_tree():
     child1_ref = writer._add_object(child1)
     tree.add_child(child1_ref, writer)
     assert tree[NameObject("/Count")] == 1
-    assert len([el for el in tree.children()]) == 1
+    assert len(list(tree.children())) == 1
 
     # Add second child
     child2 = TreeObject()
@@ -524,12 +524,12 @@ def test_remove_child_found_in_tree():
     child2_ref = writer._add_object(child2)
     tree.add_child(child2_ref, writer)
     assert tree[NameObject("/Count")] == 2
-    assert len([el for el in tree.children()]) == 2
+    assert len(list(tree.children())) == 2
 
     # Remove last child
     tree.remove_child(child2_ref)
     assert tree[NameObject("/Count")] == 1
-    assert len([el for el in tree.children()]) == 1
+    assert len(list(tree.children())) == 1
 
     # Add new child
     child3 = TreeObject()
@@ -537,32 +537,32 @@ def test_remove_child_found_in_tree():
     child3_ref = writer._add_object(child3)
     tree.add_child(child3_ref, writer)
     assert tree[NameObject("/Count")] == 2
-    assert len([el for el in tree.children()]) == 2
+    assert len(list(tree.children())) == 2
 
     # Remove first child
     child1 = tree[NameObject("/First")]
     tree.remove_child(child1)
     assert tree[NameObject("/Count")] == 1
-    assert len([el for el in tree.children()]) == 1
+    assert len(list(tree.children())) == 1
 
     child4 = TreeObject()
     child4[NameObject("/Foo")] = TextStringObject("4")
     child4_ref = writer._add_object(child4)
     tree.add_child(child4_ref, writer)
     assert tree[NameObject("/Count")] == 2
-    assert len([el for el in tree.children()]) == 2
+    assert len(list(tree.children())) == 2
 
     child5 = TreeObject()
     child5[NameObject("/Foo")] = TextStringObject("5")
     child5_ref = writer._add_object(child5)
     tree.add_child(child5_ref, writer)
     assert tree[NameObject("/Count")] == 3
-    assert len([el for el in tree.children()]) == 3
+    assert len(list(tree.children())) == 3
 
     # Remove middle child
     child4.remove_from_tree()
     assert tree[NameObject("/Count")] == 2
-    assert len([el for el in tree.children()]) == 2
+    assert len(list(tree.children())) == 2
 
     tree.empty_tree()
 
@@ -660,8 +660,7 @@ def test_bool_repr(tmp_path):
         fields = reader.get_fields(fileobj=fp)
     assert fields
     assert list(fields.keys()) == ["USGPOSignature"]
-    with open(write_path) as fp:
-        data = fp.read()
+    data = Path(write_path).read_text()
     assert data.startswith(
         "Field Name: USGPOSignature\nField Type: Signature\nField Flags: 1\n"
         "Value: {'/Type': '/Sig', '/Filter': '/Adobe.PPKLite', "

@@ -203,7 +203,6 @@ class DictionaryObject(dict, PdfObject):
             ignore_fields = list(ignore_fields)
             for lst in (("/Next", "/Prev"), ("/N", "/V")):
                 for k in lst:
-                    objs = []
                     if (
                         k in src
                         and k not in self
@@ -213,6 +212,7 @@ class DictionaryObject(dict, PdfObject):
                             "DictionaryObject", src[k]
                         )
                         prev_obj: Optional["DictionaryObject"] = self
+                        objs = []
                         while cur_obj is not None:
                             clon = cast(
                                 "DictionaryObject",
@@ -223,10 +223,7 @@ class DictionaryObject(dict, PdfObject):
                             prev_obj[NameObject(k)] = clon.indirect_reference
                             prev_obj = clon
                             try:
-                                if cur_obj == src:
-                                    cur_obj = None
-                                else:
-                                    cur_obj = cast("DictionaryObject", cur_obj[k])
+                                cur_obj = None if cur_obj == src else cast("DictionaryObject", cur_obj[k])
                             except Exception:
                                 cur_obj = None
                         for (s, c) in objs:
@@ -240,13 +237,12 @@ class DictionaryObject(dict, PdfObject):
                     vv = v.clone(pdf_dest, force_duplicate, ignore_fields)
                     assert vv.indirect_reference is not None
                     self[k.clone(pdf_dest)] = vv.indirect_reference  # type: ignore[attr-defined]
-                else:
-                    if k not in self:
-                        self[NameObject(k)] = (
-                            v.clone(pdf_dest, force_duplicate, ignore_fields)
-                            if hasattr(v, "clone")
-                            else v
-                        )
+                elif k not in self:
+                    self[NameObject(k)] = (
+                        v.clone(pdf_dest, force_duplicate, ignore_fields)
+                        if hasattr(v, "clone")
+                        else v
+                    )
 
     def raw_get(self, key: Any) -> Any:
         return dict.__getitem__(self, key)
@@ -338,16 +334,13 @@ class DictionaryObject(dict, PdfObject):
         forced_encoding: Union[None, str, List[str], Dict[int, str]] = None,
     ) -> "DictionaryObject":
         def get_next_obj_pos(
-            p: int, p1: int, rem_gens: List[int], pdf: PdfReaderProtocol
-        ) -> int:
+                p: int, p1: int, rem_gens: List[int], pdf: PdfReaderProtocol
+            ) -> int:
             loc = pdf.xref[rem_gens[0]]
             for o in loc:
                 if p1 > loc[o] and p < loc[o]:
                     p1 = loc[o]
-            if len(rem_gens) == 1:
-                return p1
-            else:
-                return get_next_obj_pos(p, p1, rem_gens[1:], pdf)
+            return p1 if len(rem_gens) == 1 else get_next_obj_pos(p, p1, rem_gens[1:], pdf)
 
         def read_unsized_from_steam(
             stream: StreamType, pdf: PdfReaderProtocol
@@ -421,10 +414,8 @@ class DictionaryObject(dict, PdfObject):
                 eol = stream.read(1)
             if eol not in (b"\n", b"\r"):
                 raise PdfStreamError("Stream data must be followed by a newline")
-            if eol == b"\r":
-                # read \n after
-                if stream.read(1) != b"\n":
-                    stream.seek(-1, 1)
+            if eol == b"\r" and stream.read(1) != b"\n":
+                stream.seek(-1, 1)
             # this is a stream object, not a dictionary
             if SA.LENGTH not in data:
                 raise PdfStreamError("Stream length not defined")
@@ -465,10 +456,9 @@ class DictionaryObject(dict, PdfObject):
             stream.seek(pos, 0)
         if "__streamdata__" in data:
             return StreamObject.initialize_from_dictionary(data)
-        else:
-            retval = DictionaryObject()
-            retval.update(data)
-            return retval
+        retval = DictionaryObject()
+        retval.update(data)
+        return retval
 
     @staticmethod
     def readFromStream(
@@ -774,10 +764,7 @@ class StreamObject(DictionaryObject):
         data: Dict[str, Any]
     ) -> Union["EncodedStreamObject", "DecodedStreamObject"]:
         retval: Union["EncodedStreamObject", "DecodedStreamObject"]
-        if SA.FILTER in data:
-            retval = EncodedStreamObject()
-        else:
-            retval = DecodedStreamObject()
+        retval = EncodedStreamObject() if SA.FILTER in data else DecodedStreamObject()
         retval._data = data["__streamdata__"]
         del data["__streamdata__"]
         del data[SA.LENGTH]
@@ -844,16 +831,15 @@ class EncodedStreamObject(StreamObject):
         if self.decoded_self is not None:
             # cached version of decoded object
             return self.decoded_self.get_data()
-        else:
-            # create decoded object
-            decoded = DecodedStreamObject()
+        # create decoded object
+        decoded = DecodedStreamObject()
 
-            decoded._data = decode_stream_data(self)
-            for key, value in list(self.items()):
-                if key not in (SA.LENGTH, SA.FILTER, SA.DECODE_PARMS):
-                    decoded[key] = value
-            self.decoded_self = decoded
-            return decoded._data
+        decoded._data = decode_stream_data(self)
+        for key, value in list(self.items()):
+            if key not in (SA.LENGTH, SA.FILTER, SA.DECODE_PARMS):
+                decoded[key] = value
+        self.decoded_self = decoded
+        return decoded._data
 
     def getData(self) -> Union[None, str, bytes]:  # deprecated
         deprecation_with_replacement("getData", "get_data", "3.0.0")
@@ -959,7 +945,7 @@ class ContentStream(DecodedStreamObject):
         operands: List[Union[int, str, PdfObject]] = []
         while True:
             peek = read_non_whitespace(stream)
-            if peek == b"" or peek == 0:
+            if peek in [b"", 0]:
                 break
             stream.seek(-1, 1)
             if peek.isalpha() or peek in (b"'", b'"'):
@@ -1018,7 +1004,7 @@ class ContentStream(DecodedStreamObject):
                 data.write(buf)
             else:
                 # Write out everything before the E.
-                data.write(buf[0:loc])
+                data.write(buf[:loc])
 
                 # Seek back in the stream to read the E next.
                 stream.seek(loc - len(buf), 1)
@@ -1106,7 +1092,7 @@ def read_object(
             return read_hex_string_from_stream(stream, forced_encoding)
     elif tok == b"[":
         return ArrayObject.read_from_stream(stream, pdf, forced_encoding)
-    elif tok == b"t" or tok == b"f":
+    elif tok in [b"t", b"f"]:
         return BooleanObject.read_from_stream(stream)
     elif tok == b"(":
         return read_string_from_stream(stream, forced_encoding)
@@ -1130,11 +1116,10 @@ def read_object(
         # number object OR indirect reference
         peek = stream.read(20)
         stream.seek(-len(peek), 1)  # reset to start
-        if IndirectPattern.match(peek) is not None:
-            assert pdf is not None  # hint for mypy
-            return IndirectObject.read_from_stream(stream, pdf)
-        else:
+        if IndirectPattern.match(peek) is None:
             return NumberObject.read_from_stream(stream)
+        assert pdf is not None  # hint for mypy
+        return IndirectObject.read_from_stream(stream, pdf)
     else:
         stream.seek(-20, 1)
         raise PdfReadError(
@@ -1339,9 +1324,7 @@ class Destination(TreeObject):
                 (self[NameObject(TA.LEFT)],) = args
             except Exception:
                 (self[NameObject(TA.LEFT)],) = (NullObject(),)
-        elif typ in [TF.FIT, TF.FIT_B]:
-            pass
-        else:
+        elif typ not in [TF.FIT, TF.FIT_B]:
             raise PdfReadError(f"Unknown Destination Type: {typ!r}")
 
     @property

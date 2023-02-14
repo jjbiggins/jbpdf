@@ -127,7 +127,7 @@ def test_ASCIIHexDecode_no_eod():
 @pytest.mark.xfail()
 def test_ASCII85Decode_with_overflow():
     inputs = (
-        v + "~>"
+        f"{v}~>"
         for v in "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x0e\x0f"
         "\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a"
         "\x1b\x1c\x1d\x1e\x1fvwxy{|}~\x7f\x80\x81\x82"
